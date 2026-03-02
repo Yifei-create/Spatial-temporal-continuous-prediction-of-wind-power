@@ -1,0 +1,88 @@
+# ========== DATA ==========
+data/
+*.npz
+.npz
+*.npy
+*.npz
+*.csv
+*.tsv
+*.parquet
+*.h5
+*.hdf5
+*.feather
+*.pickle
+*.pkl
+*.pt
+*.pth
+*.ckpt
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+
+# ========== TRAIN OUTPUT ==========
+checkpoints/
+results/
+
+# ========== MODEL ==========
+*.pt
+*.pth
+*.ckpt
+
+
+
+log/
+*.pkl
+log_*.txt
+
+# Python 缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+
+
+# 系统和 IDE 文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# 环境变量和配置文件
+.env
+.env.local
+.env.*.local
+
+# Jupyter Notebook 相关
+.ipynb_checkpoints/
+*.ipynb
+
+# 临时文件
+*.tmp
+*.temp
+*.log
+*.out
+
+# 其他
+*.bak
+*.cache
+
