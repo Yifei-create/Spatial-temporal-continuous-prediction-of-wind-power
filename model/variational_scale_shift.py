@@ -62,13 +62,13 @@ class VariationalScaleShift_Model(nn.Module):
         self.fc = nn.Linear(args.gcn["out_channel"], args.y_len)
         self.activation = nn.GELU()
         
-        # Variational parameters: mean and log variance (initialized to 0, corresponding to prior N(0,1))
+        # Variational parameters
         self.mu_scale = nn.Parameter(torch.zeros(args.base_node_size, 1))
         self.mu_shift = nn.Parameter(torch.zeros(args.base_node_size, 1))
         self.log_var_scale = nn.Parameter(torch.zeros(args.base_node_size, 1))
         self.log_var_shift = nn.Parameter(torch.zeros(args.base_node_size, 1))
         
-        self.year = args.year
+        self.period = args.period
         self.num_nodes = args.base_node_size
     
     def count_parameters(self):
@@ -90,16 +90,23 @@ class VariationalScaleShift_Model(nn.Module):
     
     def forward(self, data, adj):
         N = adj.shape[0]
-        
-        x = data.x.reshape((-1, N, self.args.gcn["in_channel"]))  # (B, N, D)
-        B, N, T = x.shape
+        D_in = self.args.gcn["in_channel"]
+
+        # Keep a stable residual tensor: (B*N, D_in)
+        x_in = data.x
+
+        # (B*N, D_in) -> (B, N, D_in)
+        x = x_in.reshape((-1, N, D_in))
+        B = x.shape[0]
         
         if self.training:
             # Training: sample using reparameterization trick
             std_scale = torch.exp(0.5 * self.log_var_scale[:N, :])
             std_shift = torch.exp(0.5 * self.log_var_shift[:N, :])
+
             eps_scale = torch.randn_like(std_scale, device=x.device, dtype=x.dtype)
             eps_shift = torch.randn_like(std_shift, device=x.device, dtype=x.dtype)
+
             adaptive_scale = self.mu_scale[:N, :] + std_scale * eps_scale
             adaptive_shift = self.mu_shift[:N, :] + std_shift * eps_shift
             
@@ -113,8 +120,8 @@ class VariationalScaleShift_Model(nn.Module):
             adaptive_shift = self.mu_shift[:N, :]
             kl_term = None
         
-        # Apply scale-shift transformation
-        x = x * (1 + adaptive_scale.unsqueeze(0)) + adaptive_shift.unsqueeze(0)  # (B, N, D)
+        # Apply scale-shift transformation (broadcast over D_in)
+        x = x * (1 + adaptive_scale.unsqueeze(0)) + adaptive_shift.unsqueeze(0)  # (B, N, D_in)
         
         # GCN1
         x = F.relu(self.gcn1(x, adj))  # (B, N, hidden)
@@ -128,8 +135,8 @@ class VariationalScaleShift_Model(nn.Module):
         x = self.gcn2(x, adj)  # (B, N, out)
         x = x.reshape((-1, self.args.gcn["out_channel"]))  # (B*N, out)
         
-        # Residual connection
-        x = x + data.x
+        # Residual connection (requires out_channel == in_channel)
+        x = x + x_in
         
         # Output
         x = self.fc(self.activation(x))

@@ -9,16 +9,29 @@ class Config:
         self.graph_path = "data/graph/"
         self.model_path = "log/"
         
-        self.begin_year = 0
-        self.end_year = 3
+        self.begin_period = 0
+        self.end_period = 3
         self.data_process = False
-        
+
+        # ====== window lengths ======
+        self.x_len = 12
+        self.y_len = 12
+
+        # ====== feature dimension in raw data ======
+        self.num_features = 16
+
+        # ====== GCN channels: follow EAC's idea "time-window as node feature" ======
+        # Each node feature vector = (x_len * num_features)
+        in_dim = self.x_len * self.num_features
+
         self.gcn = {
-            "in_channel": 16,
+            "in_channel": in_dim,
             "hidden_channel": 64,
-            "out_channel": 16
+            # To keep EAC residual x + data.x valid, out_channel must equal in_channel
+            "out_channel": in_dim
         }
         
+        # ====== TCN config ======
         self.tcn = {
             "in_channel": 1,
             "out_channel": 1,
@@ -26,12 +39,9 @@ class Config:
             "dilation": 1
         }
         
-        self.x_len = 12
-        self.y_len = 12
-        
         self.batch_size = 64
         self.epoch = 100
-        self.lr = 0.03
+        self.lr = 0.0001
         self.dropout = 0.0
         self.loss = "mse"
         
@@ -49,7 +59,7 @@ class Config:
         self.ewc = False
         self.num_hops = 2
         
-        self.load_first_year = False
+        self.load_first_period = False
         self.kl_weight = 1e-4
         
         self.method = method

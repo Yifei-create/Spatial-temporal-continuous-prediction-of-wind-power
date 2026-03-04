@@ -43,26 +43,32 @@ def masked_mape_np(y_true, y_pred, null_val=np.nan):
         return np.mean(mape) * 100
 
 def cal_metric(ground_truth, prediction, args):
-    """Calculate and log various metrics"""
-    args.logger.info("[*] year {}, testing".format(args.year))
-    mae_list, rmse_list, mape_list = [], [], []
-    
-    for i in range(1, 13):
-        mae = masked_mae_np(ground_truth[:, :, :i], prediction[:, :, :i], 0)
-        rmse = masked_mse_np(ground_truth[:, :, :i], prediction[:, :, :i], 0) ** 0.5
-        mape = masked_mape_np(ground_truth[:, :, :i], prediction[:, :, :i], 0)
-        mae_list.append(mae)
-        rmse_list.append(rmse)
-        mape_list.append(mape)
-        
-        if i == 3 or i == 6 or i == 12:
-            args.logger.info("T:{:d}\tMAE\t{:.4f}\tRMSE\t{:.4f}\tMAPE\t{:.4f}".format(i, mae, rmse, mape))
-            args.result[str(i)][" MAE"][args.year] = mae
-            args.result[str(i)]["MAPE"][args.year] = mape
-            args.result[str(i)]["RMSE"][args.year] = rmse
-    
-    args.result["Avg"][" MAE"][args.year] = np.mean(mae_list)
-    args.result["Avg"]["RMSE"][args.year] = np.mean(rmse_list)
-    args.result["Avg"]["MAPE"][args.year] = np.mean(mape_list)
-    args.logger.info("T:Avg\tMAE\t{:.4f}\tRMSE\t{:.4f}\tMAPE\t{:.4f}".format(
-        np.mean(mae_list), np.mean(rmse_list), np.mean(mape_list)))
+    """
+    Calculate and log metrics for the whole prediction horizon.
+
+    ground_truth / prediction: (num_samples, num_nodes, y_len)
+    Only valid points (y_true != 0) are counted (masked metrics).
+    """
+    period = args.period
+    y_len = getattr(args, "y_len", ground_truth.shape[-1])
+
+    # Use full horizon up to y_len
+    gt = ground_truth[:, :, :y_len]
+    pr = prediction[:, :, :y_len]
+
+    mae = masked_mae_np(gt, pr, 0)
+    rmse = masked_mse_np(gt, pr, 0) ** 0.5
+    mape = masked_mape_np(gt, pr, 0)
+
+    # Store in args.result by period
+    if not hasattr(args, "result") or args.result is None:
+        args.result = {}
+    if period not in args.result:
+        args.result[period] = {}
+
+    args.result[period]["MAE"] = float(mae)
+    args.result[period]["RMSE"] = float(rmse)
+    args.result[period]["MAPE"] = float(mape)
+
+    args.logger.info("[*] period {}, testing".format(period))
+    args.logger.info("Period {}\tMAE\t{:.4f}\tRMSE\t{:.4f}\tMAPE\t{:.4f}".format(period, mae, rmse, mape))

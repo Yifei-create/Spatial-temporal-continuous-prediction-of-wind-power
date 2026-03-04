@@ -1,25 +1,7 @@
 # ========== DATA ==========
-data/
-*.npz
-.npz
-*.npy
-*.npz
-*.csv
-*.tsv
-*.parquet
-*.h5
-*.hdf5
-*.feather
-*.pickle
-*.pkl
-*.pt
-*.pth
-*.ckpt
-*.zip
-*.tar
-*.tar.gz
-*.7z
-*.rar
+data/raw/
+data/processed/
+data/graph/
 
 # ========== TRAIN OUTPUT ==========
 checkpoints/

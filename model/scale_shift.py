@@ -34,7 +34,7 @@ class BatchGCNConv(nn.Module):
 class ScaleShift_Model(nn.Module):
     """
     Deterministic Scale-Shift Model
-    x' = (1 + scale) * x + shift
+      x' = (1 + scale) * x + shift
     Two scalar parameters per node: scale and shift
     """
     def __init__(self, args):
@@ -63,7 +63,7 @@ class ScaleShift_Model(nn.Module):
         self.scale = nn.Parameter(torch.zeros(args.base_node_size, 1))
         self.shift = nn.Parameter(torch.zeros(args.base_node_size, 1))
         
-        self.year = args.year
+        self.period = args.period
         self.num_nodes = args.base_node_size
     
     def count_parameters(self):
@@ -74,14 +74,20 @@ class ScaleShift_Model(nn.Module):
     
     def forward(self, data, adj):
         N = adj.shape[0]
-        
-        x = data.x.reshape((-1, N, self.args.gcn["in_channel"]))  # (B, N, D)
-        B, N, T = x.shape
-        
+        D_in = self.args.gcn["in_channel"]
+
+        # data.x is expected to be (B*N, D_in)
+        x_in = data.x  # keep a stable residual tensor
+
+        # (B*N, D_in) -> (B, N, D_in)
+        x = x_in.reshape((-1, N, D_in))
+        B = x.shape[0]
+
         # Apply scale-shift transformation: x' = (1 + scale) * x + shift
+        # scale/shift are (N, 1) and broadcast over D_in
         adaptive_scale = self.scale[:N]  # (N, 1)
         adaptive_shift = self.shift[:N]  # (N, 1)
-        x = x * (1 + adaptive_scale.unsqueeze(0)) + adaptive_shift.unsqueeze(0)  # (B, N, D)
+        x = x * (1 + adaptive_scale.unsqueeze(0)) + adaptive_shift.unsqueeze(0)  # (B, N, D_in)
         
         # GCN1
         x = F.relu(self.gcn1(x, adj))  # (B, N, hidden)
@@ -95,8 +101,8 @@ class ScaleShift_Model(nn.Module):
         x = self.gcn2(x, adj)  # (B, N, out)
         x = x.reshape((-1, self.args.gcn["out_channel"]))  # (B*N, out)
         
-        # Residual connection
-        x = x + data.x
+        # Residual connection (requires out_channel == in_channel to match x_in)
+        x = x + x_in
         
         # Output
         x = self.fc(self.activation(x))

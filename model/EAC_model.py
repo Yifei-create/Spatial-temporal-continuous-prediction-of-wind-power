@@ -56,7 +56,7 @@ class EAC_Model(nn.Module):
         self.gcn1 = BatchGCNConv(args.gcn["in_channel"], args.gcn["hidden_channel"], bias=True, gcn=False)
         self.gcn2 = BatchGCNConv(args.gcn["hidden_channel"], args.gcn["out_channel"], bias=True, gcn=False)
         
-        # TCN layer
+        # TCN layer (EAC style: Conv1d on (B*N, 1, hidden))
         self.tcn1 = nn.Conv1d(
             in_channels=args.tcn["in_channel"], 
             out_channels=args.tcn["out_channel"], 
@@ -73,7 +73,7 @@ class EAC_Model(nn.Module):
         self.U = nn.Parameter(torch.empty(args.base_node_size, self.rank).uniform_(-0.1, 0.1))
         self.V = nn.Parameter(torch.empty(self.rank, args.gcn["in_channel"]).uniform_(-0.1, 0.1))
         
-        self.year = args.year
+        self.period = args.period
         self.num_nodes = args.base_node_size
     
     def count_parameters(self):
@@ -84,30 +84,41 @@ class EAC_Model(nn.Module):
     
     def forward(self, data, adj):
         N = adj.shape[0]
+        D_in = self.args.gcn["in_channel"]
         
-        x = data.x.reshape((-1, N, self.args.gcn["in_channel"]))  # (B, N, D)
-        B, N, T = x.shape
+        # data.x is expected to be (B*N, D_in) after PyG batching
+        x_in = data.x  # keep for residual, shape: (B*N, D_in)
         
-        # Compute adaptive parameters: p = U @ V
-        adaptive_params = torch.mm(self.U[:N, :], self.V)  # (N, D)
-        x = x + adaptive_params.unsqueeze(0).expand(B, *adaptive_params.shape)  # (B, N, D)
+        # (B*N, D_in) -> (B, N, D_in)
+        x = x_in.reshape((-1, N, D_in))
+        B = x.shape[0]
         
-        # GCN1
-        x = F.relu(self.gcn1(x, adj))  # (B, N, hidden)
-        x = x.reshape((-1, 1, self.args.gcn["hidden_channel"]))  # (B*N, 1, hidden)
+        # Compute adaptive parameters: p = U @ V  -> (N, D_in)
+        adaptive_params = torch.mm(self.U[:N, :], self.V)
+        x = x + adaptive_params.unsqueeze(0).expand(B, *adaptive_params.shape)
+        
+        # GCN1: (B, N, hidden)
+        x = F.relu(self.gcn1(x, adj))
+        
+        # (B, N, hidden) -> (B*N, 1, hidden)  (EAC style)
+        x = x.reshape((-1, 1, self.args.gcn["hidden_channel"]))
         
         # TCN
-        x = self.tcn1(x)  # (B*N, 1, hidden)
+        x = self.tcn1(x)
         
-        # GCN2
-        x = x.reshape((-1, N, self.args.gcn["hidden_channel"]))  # (B, N, hidden)
-        x = self.gcn2(x, adj)  # (B, N, out)
-        x = x.reshape((-1, self.args.gcn["out_channel"]))  # (B*N, out)
+        # Back to (B, N, hidden)
+        x = x.reshape((-1, N, self.args.gcn["hidden_channel"]))
         
-        # Residual connection
-        x = x + data.x
+        # GCN2: (B, N, out)
+        x = self.gcn2(x, adj)
         
-        # Output
+        # (B, N, out) -> (B*N, out)
+        x = x.reshape((-1, self.args.gcn["out_channel"]))
+        
+        # Residual connection (requires out_channel == in_channel, ensured by config)
+        x = x + x_in
+        
+        # Output: (B*N, y_len)
         x = self.fc(self.activation(x))
         x = F.dropout(x, p=self.dropout, training=self.training)
         
