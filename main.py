@@ -16,12 +16,12 @@ from trainer import train, test_model, load_test_best_model, mkdirs
 from util.logger import get_logger
 from util.training_utils import seed_anything
 
+
 def main(args):
     args.logger.info("params : %s", vars(args))
 
-    # ===== CHANGED: store metrics by period directly (no more 3/6/12) =====
+    # store metrics by period
     args.result = {}  # {period: {"MAE":..., "RMSE":..., "MAPE":..., "total_time":...}}
-    # =====================================================================
 
     mkdirs(args.save_data_path)
     vars(args)["graph_size_list"] = []
@@ -94,7 +94,6 @@ def main(args):
                 )
                 test_model(model, args, test_loader, pin_memory=True)
 
-    # ===== CHANGED: print exactly what you want =====
     args.logger.info("\n\n=== Final Metrics by Period ===")
     mae_list, rmse_list, mape_list = [], [], []
 
@@ -122,7 +121,6 @@ def main(args):
             )
         )
 
-    # Keep your original time summary (but don't crash if not present)
     total_time = 0.0
     args.logger.info("\n=== Time Summary ===")
     for period in range(args.begin_period, args.end_period + 1):
@@ -137,7 +135,7 @@ def main(args):
             args.logger.info(info)
 
     args.logger.info("total time: {:.4f}".format(total_time))
-    # =================================================
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
@@ -150,15 +148,27 @@ if __name__ == "__main__":
                         help="1: process raw data first time, 0: load processed data")
     parser.add_argument("--train", type=int, default=1, help="1: train, 0: test only")
 
+    # allow overriding period range from CLI
+    parser.add_argument("--begin_period", type=int, default=None, help="Override begin_period in config")
+    parser.add_argument("--end_period", type=int, default=None, help="Override end_period in config")
+
     args = parser.parse_args()
 
     config = Config(method=args.method, logname=args.logname, seed=args.seed, gpuid=args.gpuid)
 
+    # merge config into args if args doesn't already have the field
     for key, value in vars(config).items():
         if not hasattr(args, key):
             setattr(args, key, value)
 
-    vars(args)["device"] = torch.device("cuda:{}".format(args.gpuid)) if torch.cuda.is_available() and args.gpuid != -1 else torch.device("cpu")
+    # CLI overrides config
+    if args.begin_period is not None:
+        setattr(args, "begin_period", args.begin_period)
+    if args.end_period is not None:
+        setattr(args, "end_period", args.end_period)
+
+    vars(args)["device"] = torch.device("cuda:{}".format(args.gpuid)) \
+        if torch.cuda.is_available() and args.gpuid != -1 else torch.device("cpu")
 
     vars(args)["methods"] = {
         'EAC': EAC_Model,
