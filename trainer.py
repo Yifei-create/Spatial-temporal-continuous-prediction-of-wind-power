@@ -313,7 +313,6 @@ def train(inputs, args):
 
 
 def test_model(model, args, testset, pin_memory):
-    """Test function - 保存预测结果和真实值"""
     model.eval()
     pred_ = []
     truth_ = []
@@ -344,13 +343,11 @@ def test_model(model, args, testset, pin_memory):
         pred_ = np.concatenate(pred_, 0)
         truth_ = np.concatenate(truth_, 0)
         
-        # 计算指标
         cal_metric(truth_, pred_, args)
         
-        # 保存预测结果和真实值到npz文件
         results_dir = osp.join(args.path, "results")
         mkdirs(results_dir)
         save_path = osp.join(results_dir, f"period_{args.period}_predictions.npz")
         np.savez(save_path, predictions=pred_, ground_truth=truth_)
-        args.logger.info(f"[*] 已保存预测结果和真实值到: {save_path}")
-        args.logger.info(f"[*] 数据形状 - predictions: {pred_.shape}, ground_truth: {truth_.shape}")
+        args.logger.info(f"[*] Saved predictions and ground truth to: {save_path}")
+        args.logger.info(f"[*] Data shape - predictions: {pred_.shape}, ground_truth: {truth_.shape}")
