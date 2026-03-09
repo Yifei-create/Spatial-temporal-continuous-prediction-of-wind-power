@@ -2,15 +2,13 @@ import os.path as osp
 
 class Config:
     """STCWPF Configuration"""
-    
+
     def __init__(self, method="EAC", logname="eac", seed=42, gpuid=0):
         self.raw_data_path = "data/processed/"
         self.save_data_path = "data/processed/"
         self.graph_path = "data/graph/"
         self.model_path = "log/"
-        
-        self.begin_period = 0
-        self.end_period = 3
+
         self.data_process = False
 
         # ====== window lengths ======
@@ -30,7 +28,7 @@ class Config:
             # To keep EAC residual x + data.x valid, out_channel must equal in_channel
             "out_channel": in_dim
         }
-        
+
         # ====== TCN config ======
         self.tcn = {
             "in_channel": 1,
@@ -38,30 +36,25 @@ class Config:
             "kernel_size": 3,
             "dilation": 1
         }
-        
+
         self.batch_size = 64
         self.epoch = 100
         self.lr = 0.0001
         self.dropout = 0.0
         self.loss = "mse"
-        
+
         self.rank = 6
-        self.base_node_size = 44
-        
-        self.strategy = "retrain"
-        self.init = True
+        self.base_node_size = 60   # initial turbines in pretrain phase
+
         self.train = True
-        self.auto_test = True
-        
-        self.increase = False
-        self.detect = False
-        self.replay = False
-        self.ewc = False
-        self.num_hops = 2
-        
-        self.load_first_period = False
         self.kl_weight = 1e-4
-        
+
+        # ====== unified streaming framework ======
+        self.unified_data = True
+        self.num_expansions = 3    # how many times new turbines join during streaming test
+        self.warmup_days = 2       # days of warmup data when new turbines join
+        self.online_lr = 1e-4      # learning rate for online adaptive updates
+
         self.method = method
         self.logname = logname
         self.seed = seed

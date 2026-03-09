@@ -3,41 +3,28 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class BatchGCNConv(nn.Module):
-    """Batch Graph Convolutional Layer"""
-    def __init__(self, in_channels, out_channels, bias=True, gcn=False):
+    """Batch Graph Convolutional Layer (aligned with EAC gcn_conv.py)"""
+    def __init__(self, in_features, out_features, bias=True, gcn=True):
         super().__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.gcn = gcn
-        
-        self.weight = nn.Parameter(torch.Tensor(in_channels, out_channels))
-        if bias:
-            self.bias = nn.Parameter(torch.Tensor(out_channels))
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight_neigh = nn.Linear(in_features, out_features, bias=bias)
+        if not gcn:
+            self.weight_self = nn.Linear(in_features, out_features, bias=False)
         else:
-            self.register_parameter('bias', None)
-        
+            self.register_parameter('weight_self', None)
         self.reset_parameters()
-    
+
     def reset_parameters(self):
-        nn.init.xavier_uniform_(self.weight)
-        if self.bias is not None:
-            nn.init.zeros_(self.bias)
-    
+        self.weight_neigh.reset_parameters()
+        if self.weight_self is not None:
+            self.weight_self.reset_parameters()
+
     def forward(self, x, adj):
-        """
-        x: (B, N, in_channels)
-        adj: (N, N)
-        Returns: (B, N, out_channels)
-        """
-        # x @ weight
-        out = torch.matmul(x, self.weight)  # (B, N, out_channels)
-        
-        # adj @ out
-        out = torch.matmul(adj.unsqueeze(0), out)  # (B, N, out_channels)
-        
-        if self.bias is not None:
-            out = out + self.bias
-        
+        # x: [bs, N, in_features], adj: [N, N]
+        out = self.weight_neigh(torch.matmul(adj, x))
+        if self.weight_self is not None:
+            out = out + self.weight_self(x)
         return out
 
 
