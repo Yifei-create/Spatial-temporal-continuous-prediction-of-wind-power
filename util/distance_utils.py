@@ -27,7 +27,7 @@ def compute_distance_matrix(coords):
     
     for i in range(N):
         for j in range(i+1, N):
-            # Assume coords are [x, y] in meters, convert to km
+            # coords are [x, y] in meters, convert to km
             # If lat/lon, use haversine_distance
             dist = np.sqrt((coords[i, 0] - coords[j, 0])**2 + 
                           (coords[i, 1] - coords[j, 1])**2) / 1000.0

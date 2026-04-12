@@ -2,6 +2,7 @@ import random
 import numpy as np
 import torch
 
+
 def seed_anything(seed=42):
     """Set all random seeds"""
     random.seed(seed)
@@ -12,63 +13,26 @@ def seed_anything(seed=42):
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
-def mask_np(array, null_val):
-    """Generate mask matrix"""
-    if np.isnan(null_val):
-        return (~np.isnan(array)).astype('float32')
-    else:
-        return np.not_equal(array, null_val).astype('float32')
 
-def masked_mae_np(y_true, y_pred, null_val=np.nan):
-    """Calculate masked MAE"""
-    mask = mask_np(y_true, null_val)
-    mask /= mask.mean()
-    mae = np.abs(y_true - y_pred)
-    return np.mean(np.nan_to_num(mask * mae))
+def _normalize_binary_mask(mask):
+    return (mask == 1).astype(np.float32)
 
-def masked_mse_np(y_true, y_pred, null_val=np.nan):
-    """Calculate masked MSE"""
-    mask = mask_np(y_true, null_val)
-    mask /= mask.mean()
-    mse = (y_true - y_pred) ** 2
-    return np.mean(np.nan_to_num(mask * mse))
 
-def masked_mape_np(y_true, y_pred, null_val=np.nan):
-    """Calculate masked MAPE"""
-    with np.errstate(divide='ignore', invalid='ignore'):
-        mask = mask_np(y_true, null_val)
-        mask /= mask.mean()
-        mape = np.abs((y_pred - y_true) / y_true)
-        mape = np.nan_to_num(mask * mape)
-        return np.mean(mape) * 100
+def masked_mae_np_with_mask(y_true, y_pred, mask, eps=1e-6):
+    valid_mask = _normalize_binary_mask(mask)
+    err = np.abs(y_true - y_pred)
+    return float(np.sum(err * valid_mask) / (np.sum(valid_mask) + eps))
 
-def cal_metric(ground_truth, prediction, args):
-    """
-    Calculate and log metrics for the whole prediction horizon.
 
-    ground_truth / prediction: (num_samples, num_nodes, y_len)
-    Only valid points (y_true != 0) are counted (masked metrics).
-    """
-    period = args.period
-    y_len = getattr(args, "y_len", ground_truth.shape[-1])
+def masked_mse_np_with_mask(y_true, y_pred, mask, eps=1e-6):
+    valid_mask = _normalize_binary_mask(mask)
+    err = (y_true - y_pred) ** 2
+    return float(np.sum(err * valid_mask) / (np.sum(valid_mask) + eps))
 
-    # Use full horizon up to y_len
-    gt = ground_truth[:, :, :y_len]
-    pr = prediction[:, :, :y_len]
 
-    mae = masked_mae_np(gt, pr, 0)
-    rmse = masked_mse_np(gt, pr, 0) ** 0.5
-    mape = masked_mape_np(gt, pr, 0)
-
-    # Store in args.result by period
-    if not hasattr(args, "result") or args.result is None:
-        args.result = {}
-    if period not in args.result:
-        args.result[period] = {}
-
-    args.result[period]["MAE"] = float(mae)
-    args.result[period]["RMSE"] = float(rmse)
-    args.result[period]["MAPE"] = float(mape)
-
-    args.logger.info("[*] period {}, testing".format(period))
-    args.logger.info("Period {}\tMAE\t{:.4f}\tRMSE\t{:.4f}\tMAPE\t{:.4f}".format(period, mae, rmse, mape))
+def masked_mape_np_with_mask(y_true, y_pred, mask, eps=1e-6):
+    valid_mask = _normalize_binary_mask(mask)
+    value_mask = (np.abs(y_true) > eps).astype(np.float32)
+    final_mask = valid_mask * value_mask
+    err = np.abs((y_pred - y_true) / np.maximum(np.abs(y_true), eps))
+    return float(np.sum(err * final_mask) / (np.sum(final_mask) + eps) * 100.0)
