@@ -1,476 +1,145 @@
-# 运行与实验命令说明
+# Run Commands
 
-本文档给出当前框架在 `sdwpf`、`penmanshiel`、`hlrs`、`norrekaer_enge` 四个数据集上的完整运行命令。
+当前重构后的主线只支持：
 
-本文档已经基于你当前最新代码更新，主要变化如下：
+- 数据集：`sdwpf`
+- 邻接矩阵：`baseline`、`local_upstream`
+- 方法：`ScaleShift`、`VariationalScaleShift`、`EAC`、`PatchTST`
 
-1. 已删除 `Towie` 数据集，不再提供任何 `Towie` 命令。
-2. 处理结果、图结构、日志与模型目录都带有 `processing_tag`，不同数据集和不同处理版本不会互相覆盖。
-3. 静态特征已经统一为 `x/y`。
-4. `HLRS` 与 `Norrekaer Enge` 已纳入运行入口。
+## 1. 缓存与预处理规则
 
----
+当前行为固定如下：
 
-# 一、当前支持的数据集
+- `--data_process 1 --train 0`：强制重建缓存，然后结束。
+- `--data_process 1 --train 1`：强制重建缓存，然后继续训练和流式测试。
+- `--data_process 0 --train 1`：优先读取现有缓存；如果没检测到缓存，会自动先重建，再继续训练和流式测试。
+- `--data_process 0 --train 0`：不重建缓存，直接做流式测试；前提是实验权重已经存在。
 
-当前 `main.py --dataset` 只支持以下四个数据集：
-
-- `sdwpf`
-- `penmanshiel`
-- `hlrs`
-- `norrekaer_enge`
-
----
-
-# 二、处理后目录说明
-
-## 1. 处理数据目录
-
-### SDWPF
-
-- `data/processed/sdwpf/final_xy_16feat_multifreq_maskv1/distance/`
-- `data/processed/sdwpf/final_xy_16feat_multifreq_maskv1/wind_aware_local/`
-- `data/processed/sdwpf/final_xy_16feat_multifreq_maskv1/wind_aware/`
-
-### Penmanshiel
-
-- `data/processed/penmanshiel/final_xy_10feat_10min_maskv1/distance/`
-- `data/processed/penmanshiel/final_xy_10feat_10min_maskv1/wind_aware_local/`
-- `data/processed/penmanshiel/final_xy_10feat_10min_maskv1/wind_aware/`
-
-### HLRS
-
-- `data/processed/hlrs/final_xy_5feat_hourly_maskv1/distance/`
-- `data/processed/hlrs/final_xy_5feat_hourly_maskv1/wind_aware_local/`
-- `data/processed/hlrs/final_xy_5feat_hourly_maskv1/wind_aware/`
-
-### Norrekaer Enge
-
-- `data/processed/norrekaer_enge/final_xy_4feat_fullrange10min_maskv1/distance/`
-- `data/processed/norrekaer_enge/final_xy_4feat_fullrange10min_maskv1/wind_aware_local/`
-- `data/processed/norrekaer_enge/final_xy_4feat_fullrange10min_maskv1/wind_aware/`
-
----
-
-## 2. 图目录
-
-### SDWPF
-
-- `data/graph/sdwpf/final_xy_16feat_multifreq_maskv1/distance/`
-- `data/graph/sdwpf/final_xy_16feat_multifreq_maskv1/wind_aware_local/`
-- `data/graph/sdwpf/final_xy_16feat_multifreq_maskv1/wind_aware/`
-
-### Penmanshiel
-
-- `data/graph/penmanshiel/final_xy_10feat_10min_maskv1/distance/`
-- `data/graph/penmanshiel/final_xy_10feat_10min_maskv1/wind_aware_local/`
-- `data/graph/penmanshiel/final_xy_10feat_10min_maskv1/wind_aware/`
-
-### HLRS
-
-- `data/graph/hlrs/final_xy_5feat_hourly_maskv1/distance/`
-- `data/graph/hlrs/final_xy_5feat_hourly_maskv1/wind_aware_local/`
-- `data/graph/hlrs/final_xy_5feat_hourly_maskv1/wind_aware/`
-
-### Norrekaer Enge
-
-- `data/graph/norrekaer_enge/final_xy_4feat_fullrange10min_maskv1/distance/`
-- `data/graph/norrekaer_enge/final_xy_4feat_fullrange10min_maskv1/wind_aware_local/`
-- `data/graph/norrekaer_enge/final_xy_4feat_fullrange10min_maskv1/wind_aware/`
-
----
-
-## 3. 日志与模型目录
-
-日志、checkpoint、预测结果按下面规则保存：
-
-- `log/{dataset}-{processing_tag}-{adj_type}-{logname}-{seed}/`
-
-例如：
-
-- `log/sdwpf-final_xy_16feat_multifreq_maskv1-distance-eac-42/`
-- `log/penmanshiel-final_xy_10feat_10min_maskv1-wind_aware_local-eac-42/`
-- `log/hlrs-final_xy_5feat_hourly_maskv1-distance-eac-42/`
-- `log/norrekaer_enge-final_xy_4feat_fullrange10min_maskv1-wind_aware_local-eac-42/`
-
-目录中会保留：
-
-- 日志文件
-- `pretrain/` checkpoint
-- `results/` 预测结果
-
----
-
-# 三、建议的实验顺序
-
-建议严格按照下面顺序进行：
-
-1. 先处理数据：`--data_process 1 --train 0`
-2. 再正式训练与测试：`--data_process 0 --train 1`
-3. 如果已有 checkpoint，只做 streaming 测试：`--data_process 0 --train 0`
-4. 如果做 warmup 消融，加上：`--no_warmup 1`
-
----
-
-# 四、先重新处理数据
-
-说明：
-
-- 首次运行某个 `dataset × adj_type` 组合时，必须先处理数据。
-- 如果你修改了特征列、mask 规则、processing tag、时间范围，也必须重新处理数据。
-
----
-
-## 1. SDWPF 数据处理
-
-### distance
+如果你只是想单独重建缓存，可以运行：
 
 ```bash
-python main.py --dataset sdwpf --adj_type distance --data_process 1 --train 0 --logname preprocess_sdwpf_distance
+python main.py --dataset sdwpf --graph_variant baseline --data_process 1 --train 0 --logname preprocess_sdwpf_baseline
 ```
 
-### wind_aware_local
+缓存与预处理产物会写到：
+
+- `data/processed/sdwpf/preprocess__graph-baseline__seed-42__x12_y12__exp-auto/`
+- `data/graph/sdwpf/preprocess__graph-baseline__seed-42__x12_y12__exp-auto/`
+- `results/sdwpf/preprocess__graph-baseline__seed-42__x12_y12__exp-auto/`
+
+如果要强制重建 `local_upstream` 图缓存：
 
 ```bash
-python main.py --dataset sdwpf --adj_type wind_aware_local --data_process 1 --train 0 --logname preprocess_sdwpf_wal
+python main.py --dataset sdwpf --graph_variant local_upstream --data_process 1 --train 0 --logname preprocess_sdwpf_local_upstream
 ```
 
-### wind_aware
+如果你想“一条命令直接跑”，最常用的是：
 
 ```bash
-python main.py --dataset sdwpf --adj_type wind_aware --data_process 1 --train 0 --logname preprocess_sdwpf_wa
+python main.py --dataset sdwpf --graph_variant baseline --method ScaleShift --train 1 --seed 42 --logname scaleshift_sdwpf
 ```
 
----
+如果缓存已经存在，会直接训练和测试；如果缓存不存在，会自动先处理再训练。
 
-## 2. Penmanshiel 数据处理
+训练和测试读取的缓存目录同样是对应的 `preprocess__...` 目录，例如：
 
-### distance
+- `data/processed/sdwpf/preprocess__graph-baseline__seed-42__x12_y12__exp-auto/unified_data.npz`
+- `data/graph/sdwpf/preprocess__graph-baseline__seed-42__x12_y12__exp-auto/stage_*.npz`
+
+如果你明确要强制重建后再训练：
 
 ```bash
-python main.py --dataset penmanshiel --adj_type distance --data_process 1 --train 0 --logname preprocess_penmanshiel_distance
+python main.py --dataset sdwpf --graph_variant baseline --data_process 1 --method ScaleShift --train 1 --seed 42 --logname scaleshift_sdwpf
 ```
 
-### wind_aware_local
+如果你要做 no-warmup 消融：
 
 ```bash
-python main.py --dataset penmanshiel --adj_type wind_aware_local --data_process 1 --train 0 --logname preprocess_penmanshiel_wal
+python main.py --dataset sdwpf --graph_variant baseline --method ScaleShift --train 0 --seed 42 --no_warmup 1 --logname scaleshift_sdwpf_no_warmup
 ```
 
-### wind_aware
+这会关闭 streaming 阶段的 warmup，并把结果写到单独的 `warmup-off` 实验目录。
+
+## 2. 训练并测试
+
+### ScaleShift
 
 ```bash
-python main.py --dataset penmanshiel --adj_type wind_aware --data_process 1 --train 0 --logname preprocess_penmanshiel_wa
+python main.py --dataset sdwpf --graph_variant baseline --method ScaleShift --train 1 --seed 42 --logname scaleshift_sdwpf
 ```
 
----
-
-## 3. HLRS 数据处理
-
-### distance
+### VariationalScaleShift
 
 ```bash
-python main.py --dataset hlrs --adj_type distance --data_process 1 --train 0 --logname preprocess_hlrs_distance
+python main.py --dataset sdwpf --graph_variant baseline --method VariationalScaleShift --train 1 --seed 42 --logname variational_scaleshift_sdwpf
 ```
 
-### wind_aware_local
+### EAC
 
 ```bash
-python main.py --dataset hlrs --adj_type wind_aware_local --data_process 1 --train 0 --logname preprocess_hlrs_wal
+python main.py --dataset sdwpf --graph_variant baseline --method EAC --train 1 --seed 42 --logname eac_sdwpf
 ```
 
-### wind_aware
+### PatchTST
 
 ```bash
-python main.py --dataset hlrs --adj_type wind_aware --data_process 1 --train 0 --logname preprocess_hlrs_wa
+python main.py --dataset sdwpf --graph_variant baseline --method PatchTST --train 1 --seed 42 --logname patchtst_sdwpf
 ```
 
----
+## 3. 只做流式测试
 
-## 4. Norrekaer Enge 数据处理
+如果已经有对应方法的 `best.pt` checkpoint，可以直接运行：
 
-### distance
+### ScaleShift
 
 ```bash
-python main.py --dataset norrekaer_enge --adj_type distance --data_process 1 --train 0 --logname preprocess_norre_distance
+python main.py --dataset sdwpf --graph_variant baseline --method ScaleShift --train 0 --seed 42 --logname scaleshift_sdwpf
 ```
 
-### wind_aware_local
+### VariationalScaleShift
 
 ```bash
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --data_process 1 --train 0 --logname preprocess_norre_wal
+python main.py --dataset sdwpf --graph_variant baseline --method VariationalScaleShift --train 0 --seed 42 --logname variational_scaleshift_sdwpf
 ```
 
-### wind_aware
+### EAC
 
 ```bash
-python main.py --dataset norrekaer_enge --adj_type wind_aware --data_process 1 --train 0 --logname preprocess_norre_wa
+python main.py --dataset sdwpf --graph_variant baseline --method EAC --train 0 --seed 42 --logname eac_sdwpf
 ```
 
----
-
-# 五、正式训练与测试命令
-
-下面给的是最常用的正式训练命令。
-
-默认会执行：
-
-1. 读取已经处理好的数据
-2. 预训练
-3. streaming 测试
-4. 保存日志、checkpoint、预测结果
-
----
-
-## 1. SDWPF 训练与测试
-
-### distance
+### PatchTST
 
 ```bash
-python main.py --dataset sdwpf --adj_type distance --method EAC --train 1 --seed 42 --logname eac_dist_sdwpf
-python main.py --dataset sdwpf --adj_type distance --method ScaleShift --train 1 --seed 42 --logname ss_dist_sdwpf
-python main.py --dataset sdwpf --adj_type distance --method VariationalScaleShift --train 1 --seed 42 --logname vss_dist_sdwpf
-python main.py --dataset sdwpf --adj_type distance --method PatchTST --train 1 --seed 42 --logname patchtst_dist_sdwpf
+python main.py --dataset sdwpf --graph_variant baseline --method PatchTST --train 0 --seed 42 --logname patchtst_sdwpf
 ```
 
-### wind_aware_local
+## 4. 当前行为说明
 
-```bash
-python main.py --dataset sdwpf --adj_type wind_aware_local --method EAC --train 1 --seed 42 --logname eac_wal_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware_local --method ScaleShift --train 1 --seed 42 --logname ss_wal_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware_local --method VariationalScaleShift --train 1 --seed 42 --logname vss_wal_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware_local --method PatchTST --train 1 --seed 42 --logname patchtst_wal_sdwpf
+- 数据切分固定为 `2:1:7` 的 train/val/test。
+- 测试阶段使用流式预测：每次预测未来 `12` 步，每过 `12` 步接收一个新样本，再决定是否 warmup 后继续预测。
+- `ScaleShift` 和 `VariationalScaleShift` 使用原始频率窗口、静态位置嵌入和频率信号注入。
+- `EAC` 和 `PatchTST` 保留各自结构，不使用多频训练采样和静态位置嵌入。
+- warmup 只对 `ScaleShift`、`VariationalScaleShift`、`EAC` 生效；`PatchTST` 不做 warmup。
+
+## 5. 结果目录结构
+
+训练/测试结果产物统一写到：
+
+```text
+results/{dataset}/{experiment_dir}/
+  run.log
+  config.json
+  metrics.json
+  checkpoints/
+    best.pt
+    last.pt
+  predictions/
+    streaming_predictions.npz
 ```
 
-### wind_aware
+其中 `experiment_dir` 使用主要参数命名，例如：
 
-```bash
-python main.py --dataset sdwpf --adj_type wind_aware --method EAC --train 1 --seed 42 --logname eac_wa_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware --method ScaleShift --train 1 --seed 42 --logname ss_wa_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware --method VariationalScaleShift --train 1 --seed 42 --logname vss_wa_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware --method PatchTST --train 1 --seed 42 --logname patchtst_wa_sdwpf
-```
-
----
-
-## 2. Penmanshiel 训练与测试
-
-### distance
-
-```bash
-python main.py --dataset penmanshiel --adj_type distance --method EAC --train 1 --seed 42 --logname eac_dist_penmanshiel
-python main.py --dataset penmanshiel --adj_type distance --method ScaleShift --train 1 --seed 42 --logname ss_dist_penmanshiel
-python main.py --dataset penmanshiel --adj_type distance --method VariationalScaleShift --train 1 --seed 42 --logname vss_dist_penmanshiel
-python main.py --dataset penmanshiel --adj_type distance --method PatchTST --train 1 --seed 42 --logname patchtst_dist_penmanshiel
-```
-
-### wind_aware_local
-
-```bash
-python main.py --dataset penmanshiel --adj_type wind_aware_local --method EAC --train 1 --seed 42 --logname eac_wal_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware_local --method ScaleShift --train 1 --seed 42 --logname ss_wal_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware_local --method VariationalScaleShift --train 1 --seed 42 --logname vss_wal_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware_local --method PatchTST --train 1 --seed 42 --logname patchtst_wal_penmanshiel
-```
-
-### wind_aware
-
-```bash
-python main.py --dataset penmanshiel --adj_type wind_aware --method EAC --train 1 --seed 42 --logname eac_wa_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware --method ScaleShift --train 1 --seed 42 --logname ss_wa_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware --method VariationalScaleShift --train 1 --seed 42 --logname vss_wa_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware --method PatchTST --train 1 --seed 42 --logname patchtst_wa_penmanshiel
-```
-
----
-
-## 3. HLRS 训练与测试
-
-### distance
-
-```bash
-python main.py --dataset hlrs --adj_type distance --method EAC --train 1 --seed 42 --logname eac_dist_hlrs
-python main.py --dataset hlrs --adj_type distance --method ScaleShift --train 1 --seed 42 --logname ss_dist_hlrs
-python main.py --dataset hlrs --adj_type distance --method VariationalScaleShift --train 1 --seed 42 --logname vss_dist_hlrs
-python main.py --dataset hlrs --adj_type distance --method PatchTST --train 1 --seed 42 --logname patchtst_dist_hlrs
-```
-
-### wind_aware_local
-
-```bash
-python main.py --dataset hlrs --adj_type wind_aware_local --method EAC --train 1 --seed 42 --logname eac_wal_hlrs
-python main.py --dataset hlrs --adj_type wind_aware_local --method ScaleShift --train 1 --seed 42 --logname ss_wal_hlrs
-python main.py --dataset hlrs --adj_type wind_aware_local --method VariationalScaleShift --train 1 --seed 42 --logname vss_wal_hlrs
-python main.py --dataset hlrs --adj_type wind_aware_local --method PatchTST --train 1 --seed 42 --logname patchtst_wal_hlrs
-```
-
-### wind_aware
-
-```bash
-python main.py --dataset hlrs --adj_type wind_aware --method EAC --train 1 --seed 42 --logname eac_wa_hlrs
-python main.py --dataset hlrs --adj_type wind_aware --method ScaleShift --train 1 --seed 42 --logname ss_wa_hlrs
-python main.py --dataset hlrs --adj_type wind_aware --method VariationalScaleShift --train 1 --seed 42 --logname vss_wa_hlrs
-python main.py --dataset hlrs --adj_type wind_aware --method PatchTST --train 1 --seed 42 --logname patchtst_wa_hlrs
-```
-
----
-
-## 4. Norrekaer Enge 训练与测试
-
-### distance
-
-```bash
-python main.py --dataset norrekaer_enge --adj_type distance --method EAC --train 1 --seed 42 --logname eac_dist_norre
-python main.py --dataset norrekaer_enge --adj_type distance --method ScaleShift --train 1 --seed 42 --logname ss_dist_norre
-python main.py --dataset norrekaer_enge --adj_type distance --method VariationalScaleShift --train 1 --seed 42 --logname vss_dist_norre
-python main.py --dataset norrekaer_enge --adj_type distance --method PatchTST --train 1 --seed 42 --logname patchtst_dist_norre
-```
-
-### wind_aware_local
-
-```bash
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --method EAC --train 1 --seed 42 --logname eac_wal_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --method ScaleShift --train 1 --seed 42 --logname ss_wal_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --method VariationalScaleShift --train 1 --seed 42 --logname vss_wal_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --method PatchTST --train 1 --seed 42 --logname patchtst_wal_norre
-```
-
-### wind_aware
-
-```bash
-python main.py --dataset norrekaer_enge --adj_type wind_aware --method EAC --train 1 --seed 42 --logname eac_wa_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware --method ScaleShift --train 1 --seed 42 --logname ss_wa_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware --method VariationalScaleShift --train 1 --seed 42 --logname vss_wa_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware --method PatchTST --train 1 --seed 42 --logname patchtst_wa_norre
-```
-
----
-
-# 六、如果只想测试，不重新训练
-
-如果你已经有对应目录下的 `pretrain` checkpoint，可以直接只做 streaming 测试。
-
-说明：
-
-- `--train 0` 表示不重新预训练
-- 默认仍会执行 streaming test
-
----
-
-## 1. SDWPF
-
-```bash
-python main.py --dataset sdwpf --adj_type distance --method EAC --train 0 --seed 42 --logname eac_dist_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware_local --method EAC --train 0 --seed 42 --logname eac_wal_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware --method EAC --train 0 --seed 42 --logname eac_wa_sdwpf
-```
-
-## 2. Penmanshiel
-
-```bash
-python main.py --dataset penmanshiel --adj_type distance --method EAC --train 0 --seed 42 --logname eac_dist_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware_local --method EAC --train 0 --seed 42 --logname eac_wal_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware --method EAC --train 0 --seed 42 --logname eac_wa_penmanshiel
-```
-
-## 3. HLRS
-
-```bash
-python main.py --dataset hlrs --adj_type distance --method EAC --train 0 --seed 42 --logname eac_dist_hlrs
-python main.py --dataset hlrs --adj_type wind_aware_local --method EAC --train 0 --seed 42 --logname eac_wal_hlrs
-python main.py --dataset hlrs --adj_type wind_aware --method EAC --train 0 --seed 42 --logname eac_wa_hlrs
-```
-
-## 4. Norrekaer Enge
-
-```bash
-python main.py --dataset norrekaer_enge --adj_type distance --method EAC --train 0 --seed 42 --logname eac_dist_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --method EAC --train 0 --seed 42 --logname eac_wal_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware --method EAC --train 0 --seed 42 --logname eac_wa_norre
-```
-
----
-
-# 七、warmup 消融实验命令
-
-当前框架中最直接的 warmup 消融开关是：
-
-- 正常版本：`--no_warmup 0`
-- 去掉 warmup：`--no_warmup 1`
-
-建议做消融时：
-
-1. 先跑一遍正常版本，生成对应 checkpoint
-2. 再在相同设置下使用 `--train 0 --no_warmup 1` 只做 streaming 消融
-
----
-
-## 1. SDWPF warmup 消融
-
-```bash
-python main.py --dataset sdwpf --adj_type distance --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_dist_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware_local --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_wal_sdwpf
-python main.py --dataset sdwpf --adj_type wind_aware --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_wa_sdwpf
-```
-
-## 2. Penmanshiel warmup 消融
-
-```bash
-python main.py --dataset penmanshiel --adj_type distance --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_dist_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware_local --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_wal_penmanshiel
-python main.py --dataset penmanshiel --adj_type wind_aware --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_wa_penmanshiel
-```
-
-## 3. HLRS warmup 消融
-
-```bash
-python main.py --dataset hlrs --adj_type distance --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_dist_hlrs
-python main.py --dataset hlrs --adj_type wind_aware_local --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_wal_hlrs
-python main.py --dataset hlrs --adj_type wind_aware --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_wa_hlrs
-```
-
-## 4. Norrekaer Enge warmup 消融
-
-```bash
-python main.py --dataset norrekaer_enge --adj_type distance --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_dist_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_wal_norre
-python main.py --dataset norrekaer_enge --adj_type wind_aware --method EAC --train 0 --no_warmup 1 --seed 42 --logname eac_wa_norre
-```
-
----
-
-# 八、推荐你现在最先跑的命令
-
-如果你现在要开始正式实验，我建议你先按这个顺序跑：
-
-## 1. 先处理四个数据集的 `distance`
-
-```bash
-python main.py --dataset sdwpf --adj_type distance --data_process 1 --train 0 --logname preprocess_sdwpf_distance
-python main.py --dataset penmanshiel --adj_type distance --data_process 1 --train 0 --logname preprocess_penmanshiel_distance
-python main.py --dataset hlrs --adj_type distance --data_process 1 --train 0 --logname preprocess_hlrs_distance
-python main.py --dataset norrekaer_enge --adj_type distance --data_process 1 --train 0 --logname preprocess_norre_distance
-```
-
-## 2. 再跑 EAC 的正式实验
-
-```bash
-python main.py --dataset sdwpf --adj_type distance --method EAC --train 1 --seed 42 --logname eac_dist_sdwpf
-python main.py --dataset penmanshiel --adj_type distance --method EAC --train 1 --seed 42 --logname eac_dist_penmanshiel
-python main.py --dataset hlrs --adj_type distance --method EAC --train 1 --seed 42 --logname eac_dist_hlrs
-python main.py --dataset norrekaer_enge --adj_type distance --method EAC --train 1 --seed 42 --logname eac_dist_norre
-```
-
-## 3. 然后再比较 `wind_aware_local`
-
-```bash
-python main.py --dataset sdwpf --adj_type wind_aware_local --data_process 1 --train 0 --logname preprocess_sdwpf_wal
-python main.py --dataset penmanshiel --adj_type wind_aware_local --data_process 1 --train 0 --logname preprocess_penmanshiel_wal
-python main.py --dataset hlrs --adj_type wind_aware_local --data_process 1 --train 0 --logname preprocess_hlrs_wal
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --data_process 1 --train 0 --logname preprocess_norre_wal
-
-python main.py --dataset sdwpf --adj_type wind_aware_local --method EAC --train 1 --seed 42 --logname eac_wal_sdwpf
-python main.py --dataset penmanshiel --adj_type wind_aware_local --method EAC --train 1 --seed 42 --logname eac_wal_penmanshiel
-python main.py --dataset hlrs --adj_type wind_aware_local --method EAC --train 1 --seed 42 --logname eac_wal_hlrs
-python main.py --dataset norrekaer_enge --adj_type wind_aware_local --method EAC --train 1 --seed 42 --logname eac_wal_norre
+```text
+ScaleShift__graph-baseline__seed-42__x12_y12__bs64__lr0p001__drop0__warmup-on__exp-auto
 ```

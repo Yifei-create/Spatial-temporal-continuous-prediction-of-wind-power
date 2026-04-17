@@ -68,3 +68,8 @@ htmlcov/
 *.bak
 *.cache
 
+
+# 本地目录
+/EAC/
+/log copy/
+tools/__pycache__/

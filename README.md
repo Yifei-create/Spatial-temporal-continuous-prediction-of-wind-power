@@ -30,18 +30,24 @@ Key parameters in `config/config.py`:
 
 ## Results
 
-Training results saved in:
+Run artifacts are saved in:
 ```
-log/{model}-{seed}/
-├── {model}.log          # Training log
-├── 0/                   # Period 0 models
-│   └── {loss}.pkl
-├── 1/                   # Period 1 models
-├── 2/                   # Period 2 models
-└── 3/                   # Period 3 models
+results/{dataset}/{experiment_dir}/
+├── run.log
+├── config.json
+├── metrics.json
+├── checkpoints/
+│   ├── best.pt
+│   └── last.pt
+└── predictions/
+    └── streaming_predictions.npz
 ```
 
-Metrics (MAE, RMSE, MAPE) are printed in terminal and saved in log files.
+Preprocessed caches and stage graphs remain in:
+```
+data/processed/{dataset}/{preprocess_dir}/
+data/graph/{dataset}/{preprocess_dir}/
+```
 
 ## Requirements
 
