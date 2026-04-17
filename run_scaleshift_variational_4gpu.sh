@@ -10,17 +10,15 @@ SEED="${SEED:-42}"
 GPU_IDS=(0 1 2 3)
 FORCE_PREPROCESS="${FORCE_PREPROCESS:-0}"
 
-# 当前按 3 个数据集运行：
-# sdwpf / penmanshiel / norrekaer_enge
 DATASETS=("sdwpf" "penmanshiel" "norrekaer_enge")
 GRAPH_VARIANTS=("baseline" "local_upstream")
-ALL_METHODS=("ScaleShift" "VariationalScaleShift" "EAC" "STGNN" "PatchTST")
-WARMUP_METHODS=("ScaleShift" "VariationalScaleShift" "EAC")
+ALL_METHODS=("ScaleShift" "VariationalScaleShift" "STGNN")
+WARMUP_METHODS=("ScaleShift" "VariationalScaleShift")
 
 
 activate_conda() {
   if ! command -v conda >/dev/null 2>&1; then
-    echo "conda not found. Please activate the gyf environment manually before running this script."
+    echo "conda not found. Please activate the ${CONDA_ENV} environment manually before running this script."
     return 1
   fi
   # shellcheck disable=SC1091
@@ -151,7 +149,6 @@ run_phase() {
   shift
   local jobs=("$@")
   local total_jobs="${#jobs[@]}"
-  local num_gpus="${#GPU_IDS[@]}"
   local next_job_idx=0
   local running_jobs=0
   local sleep_seconds=5
@@ -250,12 +247,13 @@ main() {
   trap cleanup INT TERM
   activate_conda
 
-  echo "Root dir      : $ROOT_DIR"
-  echo "Conda env     : $CONDA_ENV"
-  echo "Seed          : $SEED"
-  echo "Datasets      : ${DATASETS[*]}"
-  echo "GPU ids       : ${GPU_IDS[*]}"
-  echo "Force preprocess: $FORCE_PREPROCESS"
+  echo "Root dir         : $ROOT_DIR"
+  echo "Conda env        : $CONDA_ENV"
+  echo "Seed             : $SEED"
+  echo "Datasets         : ${DATASETS[*]}"
+  echo "Methods          : ${ALL_METHODS[*]}"
+  echo "GPU ids          : ${GPU_IDS[*]}"
+  echo "Force preprocess : $FORCE_PREPROCESS"
 
   local dataset graph_variant
   for dataset in "${DATASETS[@]}"; do
@@ -279,7 +277,7 @@ main() {
   run_phase "PHASE2_NO_WARMUP_ABLATION" "${PHASE2_JOBS[@]}"
 
   echo "============================================================"
-  echo "All scheduled experiments completed."
+  echo "All ScaleShift / VariationalScaleShift / STGNN experiments completed."
   echo "============================================================"
 }
 

@@ -9,7 +9,7 @@ from config.config import Config, SUPPORTED_DATASETS, WARMUP_METHODS
 from config.dataset_registry import DATASET_REGISTRY
 from data.data_processing import process_unified_dataset
 from data.graph_generation import SUPPORTED_GRAPH_VARIANTS
-from model import EAC_Model, PatchTST_Model, ScaleShift_Model, VariationalScaleShift_Model
+from model import EAC_Model, PatchTST_Model, STGNN_Model, ScaleShift_Model, VariationalScaleShift_Model
 from trainer import mkdirs, pretrain, streaming_test
 from util.logger import get_logger
 from util.training_utils import seed_anything
@@ -332,7 +332,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--dataset", type=str, default=SUPPORTED_DATASETS[0], choices=list(SUPPORTED_DATASETS))
-    parser.add_argument("--method", type=str, default="ScaleShift", choices=["ScaleShift", "VariationalScaleShift", "EAC", "PatchTST"])
+    parser.add_argument("--method", type=str, default="ScaleShift", choices=["ScaleShift", "VariationalScaleShift", "EAC", "STGNN", "PatchTST"])
     parser.add_argument("--graph_variant", type=str, default=SUPPORTED_GRAPH_VARIANTS[0], choices=list(SUPPORTED_GRAPH_VARIANTS))
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--gpuid", type=int, default=0)
@@ -366,6 +366,7 @@ if __name__ == "__main__":
         "ScaleShift": ScaleShift_Model,
         "VariationalScaleShift": VariationalScaleShift_Model,
         "EAC": EAC_Model,
+        "STGNN": STGNN_Model,
         "PatchTST": PatchTST_Model,
     }
     seed_anything(args.seed)

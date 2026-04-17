@@ -440,7 +440,7 @@ def pretrain(raw_data, feature_observed_mask, patv_mask, initial_cols, pretrain_
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     best_val = float("inf")
-    patience = 10
+    patience = 5
     stale_epochs = 0
 
     for epoch in range(args.epoch):
@@ -501,7 +501,7 @@ def pretrain_patchtst(raw_data, feature_observed_mask, patv_mask, initial_cols, 
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     best_val = float("inf")
-    patience = 10
+    patience = 5
     stale_epochs = 0
 
     for epoch in range(args.epoch):
