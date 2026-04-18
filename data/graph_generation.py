@@ -120,7 +120,10 @@ def generate_local_upstream_adjacency(coords, source_to_target_probability, top_
     dist_matrix = compute_distance_matrix(coords)
     sigma_km = _pairwise_distance_std_km(dist_matrix)
     distance_weight = np.exp(-(dist_matrix ** 2) / (sigma_km ** 2)).astype(np.float32)
-    source_to_target = source_to_target_probability.astype(np.float32) * distance_weight
+    # Keep distance as the primary structural prior and use upstream strength
+    # only as a soft modulation term in [0.5, 1.0].
+    upstream_modulation = 0.5 * (1.0 + source_to_target_probability.astype(np.float32))
+    source_to_target = distance_weight * upstream_modulation
     np.fill_diagonal(source_to_target, 0.0)
 
     sparse_source_to_target = np.zeros_like(source_to_target, dtype=np.float32)

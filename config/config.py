@@ -6,7 +6,7 @@ from data.graph_generation import GRAPH_VARIANT_BASELINE, SUPPORTED_GRAPH_VARIAN
 
 SUPPORTED_DATASETS = tuple(DATASET_REGISTRY.keys())
 STATIC_EMBEDDING_METHODS = {"ScaleShift", "VariationalScaleShift"}
-FREQ_EMBEDDING_METHODS = STATIC_EMBEDDING_METHODS.copy()
+FREQ_EMBEDDING_METHODS = set()
 WARMUP_METHODS = {"ScaleShift", "VariationalScaleShift", "EAC"}
 
 
@@ -46,7 +46,7 @@ class Config:
         self.y_len = 12
         self.batch_size = 64
         self.epoch = 100
-        self.lr = 0.0001
+        self.lr = 0.00005
         self.dropout = 0.0
         self.loss = "mse"
         self.num_workers = 0
@@ -95,7 +95,7 @@ class Config:
         self.base_node_size = len(dataset_cfg["default_initial_turbines"])
         self.kl_weight = 1e-4
         self.warmup_days = 4
-        self.warmup_lr = 0.0001
+        self.warmup_lr = 0.00005
         self.warmup_gradient_steps = 10
         self.baseline_weight_threshold = 0.95
         self.local_upstream_top_k = 16
