@@ -11,6 +11,7 @@ class SpatioTemporalDataset(Dataset):
             f"{split}_y_mask",
             f"{split}_static_data",
             f"{split}_freq_id",
+            f"{split}_stage_idx",
         ]
         missing = [key for key in required if key not in inputs]
         if missing:
@@ -21,6 +22,7 @@ class SpatioTemporalDataset(Dataset):
         self.y_mask = inputs[f"{split}_y_mask"]
         self.static_data = inputs[f"{split}_static_data"]
         self.freq_id = inputs[f"{split}_freq_id"]
+        self.stage_idx = inputs[f"{split}_stage_idx"]
 
         num_samples = self.x.shape[0]
         shapes = {
@@ -28,6 +30,7 @@ class SpatioTemporalDataset(Dataset):
             "y_mask": self.y_mask.shape[0],
             "static_data": self.static_data.shape[0],
             "freq_id": self.freq_id.shape[0],
+            "stage_idx": self.stage_idx.shape[0],
         }
         inconsistent = {name: size for name, size in shapes.items() if size != num_samples}
         if inconsistent:
@@ -43,6 +46,7 @@ class SpatioTemporalDataset(Dataset):
             y_mask=torch.from_numpy(self.y_mask[index].T).float(),
             static_data=torch.from_numpy(self.static_data[index]).float(),
             freq_id=torch.tensor([int(self.freq_id[index])], dtype=torch.long),
+            stage_idx=torch.tensor([int(self.stage_idx[index])], dtype=torch.long),
         )
 
 

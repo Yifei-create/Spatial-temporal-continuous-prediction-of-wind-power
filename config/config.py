@@ -8,6 +8,12 @@ SUPPORTED_DATASETS = tuple(DATASET_REGISTRY.keys())
 STATIC_EMBEDDING_METHODS = {"ScaleShift", "VariationalScaleShift"}
 FREQ_EMBEDDING_METHODS = set()
 WARMUP_METHODS = {"ScaleShift", "VariationalScaleShift", "EAC"}
+WARMUP_METHODS.update(
+    {
+        "STGNNInputBias",
+        "STGNNStageResidual",
+    }
+)
 
 
 def _preprocess_cache_dir_name(graph_variant, seed, x_len, y_len, num_expansions):
@@ -53,6 +59,7 @@ class Config:
 
         self.num_features = len(dataset_cfg["feature_cols"])
         self.static_dim = len(dataset_cfg["static_feature_names"])
+        self.num_stages = len(dataset_cfg["default_expansion_groups"]) + 1
 
         self.method = method
         self.logname = logname

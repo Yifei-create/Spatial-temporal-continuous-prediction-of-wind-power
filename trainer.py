@@ -91,8 +91,21 @@ def freeze_backbone(model):
     model.freeze_backbone()
 
 
-NODE_ADAPTIVE_PARAMS = {"U", "scale", "shift", "mu_scale", "mu_shift", "log_var_scale", "log_var_shift"}
-GLOBAL_ADAPTIVE_PARAMS = {"V"}
+NODE_ADAPTIVE_PARAMS = {
+    "U",
+    "scale",
+    "shift",
+    "mu_scale",
+    "mu_shift",
+    "log_var_scale",
+    "log_var_shift",
+    "input_bias",
+    "stage_residual",
+}
+GLOBAL_ADAPTIVE_PARAMS = {
+    "V",
+    "stage_bias",
+}
 
 
 def _is_named_param(name, target_names):
@@ -132,6 +145,7 @@ def _empty_inputs(split_name, input_dim):
         f"{split_name}_y_mask": np.empty((0, 0, 0), dtype=np.float32),
         f"{split_name}_static_data": np.empty((0, 0, 0), dtype=np.float32),
         f"{split_name}_freq_id": np.empty((0,), dtype=np.int64),
+        f"{split_name}_stage_idx": np.empty((0,), dtype=np.int64),
     }
 
 
@@ -171,6 +185,7 @@ def _build_window_inputs(
     segment_mask,
     timestamps,
     static_data,
+    stage_idx,
     args,
     split_name,
 ):
@@ -179,7 +194,7 @@ def _build_window_inputs(
     num_features = segment.shape[2]
     patv_col = num_features - 1
 
-    xs, feature_masks, ys, ys_mask, static_features, freq_ids = [], [], [], [], [], []
+    xs, feature_masks, ys, ys_mask, static_features, freq_ids, stage_idxs = [], [], [], [], [], [], []
     for segment_start, segment_end, freq_minutes in _constant_frequency_segments(timestamps, args):
         if segment_end - segment_start < x_len + y_len:
             continue
@@ -199,6 +214,7 @@ def _build_window_inputs(
             ys_mask.append(y_window_mask)
             static_features.append(static_data)
             freq_ids.append(freq_id)
+            stage_idxs.append(stage_idx)
 
     if not xs:
         return _empty_inputs(split_name, args.gcn["in_channel"])
@@ -217,6 +233,7 @@ def _build_window_inputs(
         f"{split_name}_y_mask": ys_mask,
         f"{split_name}_static_data": np.asarray(static_features, dtype=np.float32),
         f"{split_name}_freq_id": np.asarray(freq_ids, dtype=np.int64),
+        f"{split_name}_stage_idx": np.asarray(stage_idxs, dtype=np.int64),
     }
 
 
@@ -241,6 +258,7 @@ def _build_standard_inputs(
         segment_mask,
         segment_timestamps,
         args.static_data[initial_cols],
+        0,
         args=args,
         split_name=split_name,
     )
@@ -436,6 +454,7 @@ def pretrain(raw_data, feature_observed_mask, patv_mask, initial_cols, pretrain_
     model = args.methods[args.method](args).to(args.device)
     model.expand_adaptive_params(len(initial_cols))
     args.adj = rebuild_adj(0, args)
+    args.current_stage_idx = 0
     model.count_parameters()
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr)
@@ -620,6 +639,7 @@ def _build_graph_sample(raw_data, feature_observed_mask, patv_mask, current_cols
         y_mask=torch.from_numpy(y_mask.T.astype(np.float32)).float(),
         static_data=torch.from_numpy(args.static_data[current_cols]).float(),
         freq_id=torch.tensor([int(freq_id)], dtype=torch.long),
+        stage_idx=torch.tensor([int(getattr(args, "current_stage_idx", 0))], dtype=torch.long),
     )
 
 
@@ -698,6 +718,7 @@ def streaming_test(raw_data, feature_observed_mask, patv_mask, turbine_schedule,
     current_stage = 0
     current_cols = list(initial_cols)
     args.adj = rebuild_adj(current_stage, args)
+    args.current_stage_idx = current_stage
     expansion_lookup = {int(offset): list(new_cols) for _, (offset, new_cols) in turbine_schedule.items()}
     stream_plan = _build_streaming_plan(timestamps, args)
     if not stream_plan:
@@ -725,6 +746,7 @@ def streaming_test(raw_data, feature_observed_mask, patv_mask, turbine_schedule,
             freeze_backbone(model)
             _set_adaptive_requires_grad(model, True)
             args.adj = rebuild_adj(current_stage, args)
+            args.current_stage_idx = current_stage
             warmup_state = None
             pending_sample = None
             if args.use_warmup and args.method != "PatchTST":
